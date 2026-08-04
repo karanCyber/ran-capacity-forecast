@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ran-forecast-api
+  namespace: ran-forecast
+  labels:
+    app.kubernetes.io/name: ran-forecast-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ran-forecast-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ran-forecast-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: ran-capacity-forecast:0.1.0
+          # kind/k3s load the image locally. `Always` would send kubelet to a
+          # registry that does not have it and park the pod in ErrImagePull.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: ran-forecast-config
+          # Liveness asks only "is the process wedged". Readiness asks "can this
+          # pod serve". Pointing liveness at /readyz would mean a slow artifact
+          # mount restarts every pod in a loop instead of just holding traffic.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # startupProbe gives a cold pod up to 2 minutes to load artifacts
+          # without the liveness probe killing it mid-load.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "384Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: artifacts
+              mountPath: /data/artifacts
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: artifacts
+          persistentVolumeClaim:
+            claimName: ran-forecast-artifacts
+        # readOnlyRootFilesystem is on, so anything needing scratch space gets
+        # an explicit emptyDir.
+        - name: tmp
+          emptyDir: {}

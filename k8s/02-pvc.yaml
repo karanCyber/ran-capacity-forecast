@@ -1,0 +1,18 @@
+# Shared storage between the retrain CronJob (writer) and the API pods (readers).
+#
+# LIMITATION, stated plainly: ReadWriteOnce means all pods binding this claim
+# must land on the same node. That is fine on kind/k3s single-node and fine for
+# this demo, but it does not survive a real multi-node cluster. The production
+# answer is object storage (S3/GCS) with the API pulling artifacts on startup,
+# or an RWX volume. See "What I would do next" in the README.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ran-forecast-artifacts
+  namespace: ran-forecast
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

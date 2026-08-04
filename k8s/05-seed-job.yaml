@@ -1,0 +1,43 @@
+# One-shot job to populate the volume so the Deployment can become ready.
+# Without this the API pods come up healthy but never ready, because there is
+# nothing on the PVC to serve. Run it once after `kubectl apply -f k8s/`.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ran-forecast-seed
+  namespace: ran-forecast
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ran-forecast-seed
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: seed
+          image: ran-capacity-forecast:0.1.0
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "scripts.train", "--regenerate"]
+          envFrom:
+            - configMapRef:
+                name: ran-forecast-config
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "3Gi"
+          volumeMounts:
+            - name: artifacts
+              mountPath: /data/artifacts
+      volumes:
+        - name: artifacts
+          persistentVolumeClaim:
+            claimName: ran-forecast-artifacts

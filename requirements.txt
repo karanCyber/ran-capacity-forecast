@@ -1,0 +1,8 @@
+# Pinned to minor versions: reproducible builds matter more than latest here.
+pandas>=2.2,<4
+numpy>=1.26,<3
+pyarrow>=15,<26
+lightgbm>=4.3,<5
+fastapi>=0.110,<1
+uvicorn[standard]>=0.29,<1
+pydantic>=2.6,<3

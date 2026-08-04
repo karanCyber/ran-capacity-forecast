@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ran-forecast-api
+  namespace: ran-forecast
+  labels:
+    app.kubernetes.io/name: ran-forecast-api
+spec:
+  # ClusterIP plus `kubectl port-forward` for the demo. A LoadBalancer would sit
+  # in <pending> forever on kind, and an Ingress would need a controller
+  # installed that adds nothing to what this project is demonstrating.
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ran-forecast-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

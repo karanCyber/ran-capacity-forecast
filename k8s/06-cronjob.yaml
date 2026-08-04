@@ -1,0 +1,66 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ran-forecast-retrain
+  namespace: ran-forecast
+spec:
+  # 02:00 UTC daily: after the previous day's KPI collection has settled and
+  # well before the morning planning window that consumes the output.
+  schedule: "0 2 * * *"
+  timeZone: "Etc/UTC"
+
+  # Forbid, not Allow: two retrains writing the same parquet files on the same
+  # volume is a corrupted artifact and a torn read on the API side. If last
+  # night's run is somehow still going, skip tonight and alert instead.
+  concurrencyPolicy: Forbid
+
+  # If the cluster was down at 02:00, only run if we are within an hour of the
+  # scheduled time. Retraining at 09:00 on stale assumptions is worse than not
+  # retraining; the API keeps serving yesterday's artifacts either way.
+  startingDeadlineSeconds: 3600
+
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      # Hard stop. A retrain that has run for two hours is stuck, and letting it
+      # hold the Forbid lock would silently skip every subsequent night.
+      activeDeadlineSeconds: 7200
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: ran-forecast-retrain
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            fsGroup: 10001
+          containers:
+            - name: retrain
+              image: ran-capacity-forecast:0.1.0
+              imagePullPolicy: IfNotPresent
+              # --regenerate extends the synthetic series so there is genuinely
+              # new data each night. Against a real OSS/northbound feed this
+              # would instead pull the last 24h of PM counters.
+              command: ["python", "-m", "scripts.train", "--regenerate"]
+              envFrom:
+                - configMapRef:
+                    name: ran-forecast-config
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "1Gi"
+                limits:
+                  cpu: "2000m"
+                  memory: "3Gi"
+              volumeMounts:
+                - name: artifacts
+                  mountPath: /data/artifacts
+          volumes:
+            - name: artifacts
+              persistentVolumeClaim:
+                claimName: ran-forecast-artifacts

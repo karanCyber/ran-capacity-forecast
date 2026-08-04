@@ -1,0 +1,24 @@
+# All tuning knobs live here, not in the image. Changing the anomaly threshold
+# or the forecast horizon is a ConfigMap edit plus a rollout restart, not a
+# rebuild. The application reads every one of these via os.getenv in config.py.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ran-forecast-config
+  namespace: ran-forecast
+data:
+  ARTIFACT_DIR: "/data/artifacts"
+  LOG_LEVEL: "INFO"
+
+  # Forecasting
+  HORIZON_HOURS: "24"
+  BACKTEST_DAYS: "21"
+
+  # Anomaly detection. See docs/RESULTS.md for the threshold sweep behind k=3.5.
+  ANOMALY_K: "3.5"
+  ANOMALY_CONSECUTIVE: "2"
+
+  # Synthetic data shape (used by the seed job and nightly regeneration)
+  N_CELLS: "60"
+  N_DAYS: "120"
+  RANDOM_SEED: "42"
