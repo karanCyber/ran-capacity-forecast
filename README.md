@@ -366,15 +366,6 @@ Choices worth explaining:
   kind/k3s, not fine on a real multi-node cluster. The production answer is
   object storage with artifacts pulled at startup, or an RWX volume.
 
-### `kubectl get pods`
-
-> **TODO before publishing:** run `make k8s-deploy && make k8s-status` and paste
-> the output or a screenshot here. Include the CronJob and a completed retrain
-> job — a CronJob that has *run* is far more convincing than one that has merely
-> been applied.
-
----
-
 ## Where this sits in an O-RAN architecture
 
 Conceptually this is a **non-RT RIC rApp**. It consumes cell-level performance
